@@ -3,8 +3,7 @@ module Editor
     using CImGui
     using CImGui.CSyntax
     using CImGui.CSyntax.CStatic
-    using CImGui.LibCImGui
-    using CImGui: ImVec2, ImVec4, IM_COL32, ImS32, ImU32, ImS64, ImU64, LibCImGui
+    using CImGui: ImVec2, ImVec4, IM_COL32, ImS32, ImU32, ImS64, ImU64
     using SimpleDirectMediaLayer
     const SDL2 = SimpleDirectMediaLayer
     using ImGuiOpenGLBackend #CImGui.OpenGLBackend
@@ -110,7 +109,7 @@ module Editor
                     ImGui_ImplSDL2_NewFrame();
                     CImGui.NewFrame()
 
-                    LibCImGui.igDockSpaceOverViewport(C_NULL, ImGuiDockNodeFlags_PassthruCentralNode, C_NULL) # Creating the "dockspace" that covers the whole window. This allows the child windows to automatically resize.
+                    CImGui.igDockSpaceOverViewport(C_NULL, C_NULL, ImGuiDockNodeFlags_PassthruCentralNode, C_NULL) # Creating the "dockspace" that covers the whole window. This allows the child windows to automatically resize.
                     @c CImGui.ShowDemoWindow(Ref{Bool}(showDemoWindow))
 
                     @cstatic begin

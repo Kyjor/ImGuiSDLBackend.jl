@@ -8,7 +8,7 @@ end
 # Backend data stored in io.BackendRendererUserData to allow support for multiple Dear ImGui contexts
 # It is STRONGLY preferred that you use docking branch with multi-viewports (== single Dear ImGui context + multiple windows) instead of multiple Dear ImGui contexts.
 function ImGui_ImplSDLRenderer2_GetBackendData()
-    io::Ptr{ImGuiIO} = CImGui.GetIO()
+    io::Ptr{CImGui.ImGuiIO} = CImGui.GetIO()
     ber = unsafe_load(io.BackendRendererUserData)
     return CImGui.GetCurrentContext() != C_NULL ? ber : C_NULL
 end
@@ -23,7 +23,7 @@ function ImGui_ImplSDLRenderer2_Init(renderer::Ptr{SDL2.SDL_Renderer})
     bd = ImGui_ImplSDLRenderer2_Data(renderer, C_NULL)
     io.BackendRendererUserData = pointer_from_objref(bd)
     io.BackendRendererName = pointer("imgui_impl_sdlrenderer2")
-    io.BackendFlags = unsafe_load(io.BackendFlags) | ImGuiBackendFlags_RendererHasVtxOffset # We can honor the ImDrawCmd::VtxOffset field, allowing for large meshes.
+    io.BackendFlags = unsafe_load(io.BackendFlags) | CImGui.ImGuiBackendFlags_RendererHasVtxOffset # We can honor the  CImGui.ImDrawCmd::VtxOffset field, allowing for large meshes.
     ImGui_ImplSDLRenderer2_CreateFontsTexture(bd)
     return true
 end
@@ -98,25 +98,24 @@ function ImGui_ImplSDLRenderer2_RenderDrawData(draw_data)
     # Render command lists
     ImGui_ImplSDLRenderer2_SetupRenderState()
     data = unsafe_load(draw_data)
-    cmd_lists = unsafe_wrap(Vector{Ptr{ImDrawList}}, data.CmdLists, data.CmdListsCount)
-    
+    GC.@preserve cmd_lists = unsafe_wrap(Vector{Ptr{CImGui.ImDrawList}}, data.CmdLists.Data, data.CmdListsCount)
     for cmd_list in cmd_lists
-        # cmd_list is of type IMDrawList
-        # struct ImDrawList
-        #     CmdBuffer::ImVector_ImDrawCmd
+        # cmd_list is of type  CImGui.ImDrawList
+        # struct  CImGui.ImDrawList
+        #     CmdBuffer::ImVector_ CImGui.ImDrawCmd
         #     IdxBuffer::ImVector_ImDrawIdx
         #     VtxBuffer::ImVector_ImDrawVert
-        #     Flags::ImDrawListFlags
+        #     Flags:: CImGui.ImDrawListFlags
         #     _VtxCurrentIdx::Cuint
-        #     _Data::Ptr{ImDrawListSharedData}
+        #     _Data::Ptr{ CImGui.ImDrawListSharedData}
         #     _OwnerName::Ptr{Cchar}
         #     _VtxWritePtr::Ptr{ImDrawVert}
         #     _IdxWritePtr::Ptr{ImDrawIdx}
         #     _ClipRectStack::ImVector_ImVec4
         #     _TextureIdStack::ImVector_ImTextureID
         #     _Path::ImVector_ImVec2
-        #     _CmdHeader::ImDrawCmdHeader
-        #     _Splitter::ImDrawListSplitter
+        #     _CmdHeader:: CImGui.ImDrawCmdHeader
+        #     _Splitter:: CImGui.ImDrawListSplitter
         #     _FringeScale::Cfloat
         # end
 
@@ -127,16 +126,15 @@ function ImGui_ImplSDLRenderer2_RenderDrawData(draw_data)
         cmd_buffer = cmd_list.CmdBuffer |> unsafe_load
         
         for cmd_i = 0:cmd_buffer.Size-1
-            pcmd = cmd_buffer.Data + cmd_i * sizeof(ImDrawCmd)
-            elem_count = unsafe_load(pcmd.ElemCount)
+            pcmd = cmd_buffer.Data + cmd_i * sizeof(CImGui.ImDrawCmd)
             cb_funcptr = unsafe_load(pcmd.UserCallback)
             if cb_funcptr != C_NULL
-                # User callback, registered via ImDrawList::AddCallback()
+                # User callback, registered via  CImGui.ImDrawList::AddCallback()
                 # (ImDrawCallback_ResetRenderState is a special callback value used by the user to request the renderer to reset render state.)
                 if cb_funcptr == ctx.ImDrawCallback_ResetRenderState
                     ImGui_ImplSDLRenderer2_SetupRenderState()
                 else
-                    ccall(cb_funcptr, Cvoid, (Ptr{ImDrawList}, Ptr{ImDrawCmd}), cmd_list, pcmd)
+                    ccall(cb_funcptr, Cvoid, (Ptr{ CImGui.ImDrawList}, Ptr{ CImGui.ImDrawCmd}), cmd_list, pcmd)
                 end
             else
                 # Project scissor/clipping rectangles into framebuffer space
@@ -169,23 +167,23 @@ function ImGui_ImplSDLRenderer2_RenderDrawData(draw_data)
 
                 color = SDL2.SDL_Color(r, g, b, 250)
 
-                pos_offset = fieldoffset(ImDrawVert, 1)
-                uv_offset = fieldoffset(ImDrawVert, 2)
-                col_offset = fieldoffset(ImDrawVert, 3)
+                pos_offset = fieldoffset(CImGui.ImDrawVert, 1)
+                uv_offset = fieldoffset(CImGui.ImDrawVert, 2)
+                col_offset = fieldoffset(CImGui.ImDrawVert, 3)
                 xy = Ptr{Cfloat}(Ptr{Cvoid}(Ptr{Cchar}(vtx_buffer.Data + unsafe_load(pcmd.VtxOffset)) + pos_offset))
                 uv = Ptr{Cfloat}(Ptr{Cvoid}(Ptr{Cchar}(vtx_buffer.Data + unsafe_load(pcmd.VtxOffset)) + uv_offset))
                 color = Ptr{Int}(Ptr{Cvoid}(Ptr{Cchar}(vtx_buffer.Data + unsafe_load(pcmd.VtxOffset)) + col_offset))
                     
-                tex = Ptr{SDL2.SDL_Texture}(ImDrawCmd_GetTexID(pcmd))
+                tex = Ptr{SDL2.SDL_Texture}(CImGui.ImDrawCmd_GetTexID(pcmd))
                 offset = unsafe_load(pcmd.IdxOffset)
 
                 res = SDL2.SDL_RenderGeometryRaw(sdlRenderer,
                 tex,
-                xy, Cint(sizeof(ImDrawVert)),
-                color, Cint(sizeof(ImDrawVert)),
-                uv, Cint(sizeof(ImDrawVert)),
+                xy, Cint(sizeof(CImGui.ImDrawVert)),
+                color, Cint(sizeof(CImGui.ImDrawVert)),
+                uv, Cint(sizeof(CImGui.ImDrawVert)),
                 vtx_buffer.Size-unsafe_load(pcmd.VtxOffset),
-                Ptr{ImDrawIdx}(idx_buffer.Data + offset), unsafe_load(pcmd.ElemCount), sizeof(ImDrawIdx))
+                Ptr{CImGui.ImDrawIdx}(idx_buffer.Data + offset), unsafe_load(pcmd.ElemCount), sizeof(CImGui.ImDrawIdx))
                
                 if res != 0
                     println("error: ", unsafe_string(SDL2.SDL_GetError()))
@@ -234,11 +232,11 @@ function ImGui_ImplSDLRenderer2_CreateFontsTexture(bd)
     fonts = unsafe_load(io.Fonts)
     pixels = Ptr{Cuchar}(C_NULL)
     width, height = Cint(0), Cint(0)
-    @c ImFontAtlas_GetTexDataAsRGBA32(fonts, &pixels, &width, &height, C_NULL)
+    @c CImGui.ImFontAtlas_GetTexDataAsRGBA32(fonts, &pixels, &width, &height, C_NULL)
 
     # Upload texture to graphics system
     # (Bilinear sampling is required by default. Set 'io.Fonts.Flags |= ImFontAtlasFlags_NoBakedLines' or 'style.AntiAliasedLinesUseTex = false' to allow point/nearest sampling)
-    fonts.Flags = ImFontAtlasFlags_NoBakedLines
+    fonts.Flags = CImGui.ImFontAtlasFlags_NoBakedLines
     bd.FontTexture = SDL2.SDL_CreateTexture(bd.SDLRenderer, SDL2.SDL_PIXELFORMAT_ABGR8888, SDL2.SDL_TEXTUREACCESS_STATIC, width, height)
     if bd.FontTexture == C_NULL
         println("error creating texture")
@@ -250,7 +248,7 @@ function ImGui_ImplSDLRenderer2_CreateFontsTexture(bd)
     SDL2.SDL_SetTextureScaleMode(bd.FontTexture, SDL2.SDL_ScaleModeLinear)
 
     # store our identifier
-    ImFontAtlas_SetTexID(fonts, ImTextureID(Int(bd.FontTexture)))
+    CImGui.ImFontAtlas_SetTexID(fonts, CImGui.ImTextureID(Int(bd.FontTexture)))
 
     return true
 end
@@ -274,14 +272,14 @@ function ImGui_ImplSDLRenderer2_DestroyDeviceObjects()
 end
 
 ## reference
-# struct ImDrawListSharedData
+# struct  CImGui.ImDrawListSharedData
         #     TexUvWhitePixel::ImVec2
         #     Font::Ptr{ImFont}
         #     FontSize::Cfloat
         #     CurveTessellationTol::Cfloat
         #     CircleSegmentMaxError::Cfloat
         #     ClipRectFullscreen::ImVec4
-        #     InitialFlags::ImDrawListFlags
+        #     InitialFlags:: CImGui.ImDrawListFlags
         #     TempBuffer::ImVector_ImVec2
         #     ArcFastVtx::NTuple{48, ImVec2}
         #     ArcFastRadiusCutoff::Cfloat
@@ -290,12 +288,12 @@ end
         # end
 
 
-        # struct ImVector_ImDrawCmd
+        # struct ImVector_ CImGui.ImDrawCmd
         #     Size::Cint
         #     Capacity::Cint
-        #     Data::Ptr{ImDrawCmd}
+        #     Data::Ptr{ CImGui.ImDrawCmd}
         # end
-        # struct ImDrawCmd
+        # struct  CImGui.ImDrawCmd
         #     ClipRect::ImVec4
         #     TextureId::ImTextureID
         #     VtxOffset::Cuint
