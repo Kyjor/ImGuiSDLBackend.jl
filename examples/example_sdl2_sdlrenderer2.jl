@@ -22,7 +22,7 @@ module Editor
         SDL2.SDL_SetHint(SDL2.SDL_HINT_IME_SHOW_UI, "1")
 
         window = SDL2.SDL_CreateWindow(
-        "JulGame Editor v0.1.0", SDL2.SDL_WINDOWPOS_CENTERED, SDL2.SDL_WINDOWPOS_CENTERED, 1024, 768,
+        "Example window", SDL2.SDL_WINDOWPOS_CENTERED, SDL2.SDL_WINDOWPOS_CENTERED, 1024, 768,
         SDL2.SDL_WINDOW_SHOWN | SDL2.SDL_WINDOW_OPENGL | SDL2.SDL_WINDOW_RESIZABLE | SDL2.SDL_WINDOW_ALLOW_HIGHDPI
         )
         if window == C_NULL 
@@ -36,7 +36,6 @@ module Editor
             println("Failed to create renderer: ", unsafe_string(SDL2.SDL_GetError()))
         end
 
-        step = 0
         ver = pointer(SDL2.SDL_version[SDL2.SDL_version(0,0,0)])
         SDL2.SDL_GetVersion(ver)
         global sdlVersion = string(unsafe_load(ver).major, ".", unsafe_load(ver).minor, ".", unsafe_load(ver).patch)
@@ -108,7 +107,7 @@ module Editor
                     SDL2.SDL_RenderSetScale(renderer, unsafe_load(io.DisplayFramebufferScale.x), unsafe_load(io.DisplayFramebufferScale.y));
                     SDL2.SDL_SetRenderDrawColor(renderer, (UInt8)(round(clear_color[1] * 255)), (UInt8)(round(clear_color[2] * 255)), (UInt8)(round(clear_color[3] * 255)), (UInt8)(round(clear_color[4] * 255)));
                     SDL2.SDL_RenderClear(renderer);
-                    ImGui_ImplSDLRenderer2_RenderDrawData(CImGui.GetDrawData(), step);
+                    ImGui_ImplSDLRenderer2_RenderDrawData(CImGui.GetDrawData());
                     SDL2.SDL_RenderPresent(renderer);
                 end
             catch e
