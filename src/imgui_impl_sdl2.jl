@@ -319,10 +319,10 @@ end
 
 function ImGui_ImplSDL2_UpdateKeyModifiers(sdl_key_mods)
     io = CImGui.GetIO()
-     CImGui.ImGuiIO_AddKeyEvent(io, ImGuiMod_Ctrl, (sdl_key_mods & SDL2.KMOD_CTRL) != 0)
-     CImGui.ImGuiIO_AddKeyEvent(io, ImGuiMod_Shift, (sdl_key_mods & SDL2.KMOD_SHIFT) != 0)
-     CImGui.ImGuiIO_AddKeyEvent(io, ImGuiMod_Alt, (sdl_key_mods & SDL2.KMOD_ALT) != 0)
-     CImGui.ImGuiIO_AddKeyEvent(io, ImGuiMod_Super, (sdl_key_mods & SDL2.KMOD_GUI) != 0)
+     CImGui.ImGuiIO_AddKeyEvent(io, CImGui.ImGuiMod_Ctrl, (sdl_key_mods & SDL2.KMOD_CTRL) != 0)
+     CImGui.ImGuiIO_AddKeyEvent(io, CImGui.ImGuiMod_Shift, (sdl_key_mods & SDL2.KMOD_SHIFT) != 0)
+     CImGui.ImGuiIO_AddKeyEvent(io, CImGui.ImGuiMod_Alt, (sdl_key_mods & SDL2.KMOD_ALT) != 0)
+     CImGui.ImGuiIO_AddKeyEvent(io, CImGui.ImGuiMod_Super, (sdl_key_mods & SDL2.KMOD_GUI) != 0)
 end
 
 function ImGui_ImplSDL2_KeycodeToImGuiKey(keycode)

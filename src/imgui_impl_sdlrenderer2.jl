@@ -99,34 +99,15 @@ function ImGui_ImplSDLRenderer2_RenderDrawData(draw_data)
     ImGui_ImplSDLRenderer2_SetupRenderState()
     data = unsafe_load(draw_data)
     GC.@preserve cmd_lists = unsafe_wrap(Vector{Ptr{CImGui.ImDrawList}}, data.CmdLists.Data, data.CmdListsCount)
-    for cmd_list in cmd_lists
-        # cmd_list is of type  CImGui.ImDrawList
-        # struct  CImGui.ImDrawList
-        #     CmdBuffer::ImVector_ CImGui.ImDrawCmd
-        #     IdxBuffer::ImVector_ImDrawIdx
-        #     VtxBuffer::ImVector_ImDrawVert
-        #     Flags:: CImGui.ImDrawListFlags
-        #     _VtxCurrentIdx::Cuint
-        #     _Data::Ptr{ CImGui.ImDrawListSharedData}
-        #     _OwnerName::Ptr{Cchar}
-        #     _VtxWritePtr::Ptr{ImDrawVert}
-        #     _IdxWritePtr::Ptr{ImDrawIdx}
-        #     _ClipRectStack::ImVector_ImVec4
-        #     _TextureIdStack::ImVector_ImTextureID
-        #     _Path::ImVector_ImVec2
-        #     _CmdHeader:: CImGui.ImDrawCmdHeader
-        #     _Splitter:: CImGui.ImDrawListSplitter
-        #     _FringeScale::Cfloat
-        # end
+    for cmd_list in cmd_lists # struct  CImGui.ImDrawList
 
-        
         vtx_buffer = cmd_list.VtxBuffer |> unsafe_load
         idx_buffer = cmd_list.IdxBuffer |> unsafe_load
-        #println("Window Name: ", unsafe_string(unsafe_load(cmd_list._OwnerName)))
         cmd_buffer = cmd_list.CmdBuffer |> unsafe_load
         
         for cmd_i = 0:cmd_buffer.Size-1
             pcmd = cmd_buffer.Data + cmd_i * sizeof(CImGui.ImDrawCmd)
+
             cb_funcptr = unsafe_load(pcmd.UserCallback)
             if cb_funcptr != C_NULL
                 # User callback, registered via  CImGui.ImDrawList::AddCallback()
@@ -167,24 +148,29 @@ function ImGui_ImplSDLRenderer2_RenderDrawData(draw_data)
 
                 color = SDL2.SDL_Color(r, g, b, 250)
 
-                pos_offset = fieldoffset(CImGui.ImDrawVert, 1)
-                uv_offset = fieldoffset(CImGui.ImDrawVert, 2)
-                col_offset = fieldoffset(CImGui.ImDrawVert, 3)
+                pos_offset = offsetof(CImGui.ImDrawVert, Val(:pos))
+                uv_offset = offsetof(CImGui.ImDrawVert, Val(:uv))
+                col_offset = offsetof(CImGui.ImDrawVert, Val(:col))
                 xy = Ptr{Cfloat}(Ptr{Cvoid}(Ptr{Cchar}(vtx_buffer.Data + unsafe_load(pcmd.VtxOffset)) + pos_offset))
                 uv = Ptr{Cfloat}(Ptr{Cvoid}(Ptr{Cchar}(vtx_buffer.Data + unsafe_load(pcmd.VtxOffset)) + uv_offset))
                 color = Ptr{Int}(Ptr{Cvoid}(Ptr{Cchar}(vtx_buffer.Data + unsafe_load(pcmd.VtxOffset)) + col_offset))
                     
                 tex = Ptr{SDL2.SDL_Texture}(CImGui.ImDrawCmd_GetTexID(pcmd))
                 offset = unsafe_load(pcmd.IdxOffset)
+               
+                elem_count = Int(unsafe_load(pcmd.ElemCount))
+                indices = Ptr{CImGui.ImDrawIdx}(idx_buffer.Data + offset)
+                num_vertices = vtx_buffer.Size-(vtx_buffer.Size%3)-unsafe_load(pcmd.VtxOffset)
+                owner_name = cmd_list._OwnerName |> unsafe_load |> unsafe_string # use for debugging
 
                 res = SDL2.SDL_RenderGeometryRaw(sdlRenderer,
                 tex,
                 xy, Cint(sizeof(CImGui.ImDrawVert)),
                 color, Cint(sizeof(CImGui.ImDrawVert)),
                 uv, Cint(sizeof(CImGui.ImDrawVert)),
-                vtx_buffer.Size-unsafe_load(pcmd.VtxOffset),
-                Ptr{CImGui.ImDrawIdx}(idx_buffer.Data + offset), unsafe_load(pcmd.ElemCount), sizeof(CImGui.ImDrawIdx))
-               
+                num_vertices,
+                indices, elem_count, sizeof(CImGui.ImDrawIdx))
+
                 if res != 0
                     println("error: ", unsafe_string(SDL2.SDL_GetError()))
                 end
@@ -271,53 +257,7 @@ function ImGui_ImplSDLRenderer2_DestroyDeviceObjects()
     ImGui_ImplSDLRenderer2_DestroyFontsTexture()
 end
 
-## reference
-# struct  CImGui.ImDrawListSharedData
-        #     TexUvWhitePixel::ImVec2
-        #     Font::Ptr{ImFont}
-        #     FontSize::Cfloat
-        #     CurveTessellationTol::Cfloat
-        #     CircleSegmentMaxError::Cfloat
-        #     ClipRectFullscreen::ImVec4
-        #     InitialFlags:: CImGui.ImDrawListFlags
-        #     TempBuffer::ImVector_ImVec2
-        #     ArcFastVtx::NTuple{48, ImVec2}
-        #     ArcFastRadiusCutoff::Cfloat
-        #     CircleSegmentCounts::NTuple{64, ImU8}
-        #     TexUvLines::Ptr{ImVec4}
-        # end
-
-
-        # struct ImVector_ CImGui.ImDrawCmd
-        #     Size::Cint
-        #     Capacity::Cint
-        #     Data::Ptr{ CImGui.ImDrawCmd}
-        # end
-        # struct  CImGui.ImDrawCmd
-        #     ClipRect::ImVec4
-        #     TextureId::ImTextureID
-        #     VtxOffset::Cuint
-        #     IdxOffset::Cuint
-        #     ElemCount::Cuint
-        #     UserCallback::ImDrawCallback
-        #     UserCallbackData::Ptr{Cvoid}
-        # end
-
-        # const ImDrawIdx = Cushort
-        # struct ImVector_ImDrawIdx
-        #     Size::Cint
-        #     Capacity::Cint
-        #     Data::Ptr{ImDrawIdx}
-        # end
-
-        # struct ImDrawVert
-        #     pos::ImVec2
-        #     uv::ImVec2
-        #     col::ImU32
-        # end
-        
-        # struct ImVector_ImDrawVert
-        #     Size::Cint
-        #     Capacity::Cint
-        #     Data::Ptr{ImDrawVert}
-        # end
+@generated function offsetof(::Type{X}, ::Val{field}) where {X,field}
+    idx = findfirst(f->f==field, fieldnames(X))
+    return fieldoffset(X, idx)
+end
