@@ -56,9 +56,8 @@ module Editor
         # CImGui.StyleColorsLight()
         
         showDemoWindow = true
-        showAnotherWindow = false
         clear_color = Cfloat[0.45, 0.55, 0.60, 0.01]
-        
+
         quit = false
             try
                 while !quit

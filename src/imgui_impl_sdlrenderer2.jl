@@ -134,20 +134,12 @@ function ImGui_ImplSDLRenderer2_RenderDrawData(draw_data)
                     clip_max = ImVec2(clip_max.x, fb_height)
                 end
                 if clip_max.x <= clip_min.x || clip_max.y <= clip_min.y
-                    println("skipped")
                     continue
                 end
                 r = SDL2.SDL_Rect((Int)(round(clip_min.x)), (Int)(round(clip_min.y)), (Int)(round(clip_max.x - clip_min.x)), (Int)(round(clip_max.y - clip_min.y)))
 
                 @c SDL2.SDL_RenderSetClipRect(sdlRenderer, &r) # This prevents rendering to outside of the current window. For example, if you have a window that is 800x600 and you try to render a 1000x1000 image, it will only render the part that is inside the window.
                 
-                color = unsafe_load(vtx_buffer.Data).col
-                r = (color >> 16) & 0xFF
-                g = (color >> 8) & 0xFF
-                b = color & 0xFF
-
-                color = SDL2.SDL_Color(r, g, b, 250)
-
                 pos_offset = offsetof(CImGui.ImDrawVert, Val(:pos))
                 uv_offset = offsetof(CImGui.ImDrawVert, Val(:uv))
                 col_offset = offsetof(CImGui.ImDrawVert, Val(:col))
@@ -156,11 +148,12 @@ function ImGui_ImplSDLRenderer2_RenderDrawData(draw_data)
                 color = Ptr{Int}(Ptr{Cvoid}(Ptr{Cchar}(vtx_buffer.Data + unsafe_load(pcmd.VtxOffset)) + col_offset))
                     
                 tex = Ptr{SDL2.SDL_Texture}(CImGui.ImDrawCmd_GetTexID(pcmd))
-                offset = unsafe_load(pcmd.IdxOffset)
+                offset = unsafe_load(pcmd.IdxOffset)*2 # TODO: understand why this is necessary to multiply by 2
                
                 elem_count = Int(unsafe_load(pcmd.ElemCount))
-                indices = Ptr{CImGui.ImDrawIdx}(idx_buffer.Data + offset)
-                num_vertices = vtx_buffer.Size-(vtx_buffer.Size%3)-unsafe_load(pcmd.VtxOffset)
+                indices = Ptr{CImGui.ImDrawIdx}(idx_buffer.Data + (offset)) 
+                
+                num_vertices = vtx_buffer.Size-unsafe_load(pcmd.VtxOffset)
                 owner_name = cmd_list._OwnerName |> unsafe_load |> unsafe_string # use for debugging
 
                 res = SDL2.SDL_RenderGeometryRaw(sdlRenderer,
