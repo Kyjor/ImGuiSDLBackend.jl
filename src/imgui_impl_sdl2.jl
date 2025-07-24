@@ -1,25 +1,41 @@
 #Reference: https://github.com/ocornut/imgui/blob/master/backends/imgui_impl_sdl2.cpp
-Base.@kwdef mutable struct ImGui_ImplSDL2_Data
-    Window::Ptr{Any}
-    Renderer::Ptr{Any}
-    Time::UInt64
-    MouseWindowID::UInt32
-    MouseButtonsDown::Cint
-    MouseCursors::Vector{Ptr{Any}}
-    LastMouseCursor::Ptr{Any}
-    PendingMouseLeaveFrame::Cint
-    ClipboardTextData::Ptr{Cchar}
-    MouseCanUseGlobalState::Bool
+include("structs.jl")
+
+# TODO: Understand this and make it work in Julia
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
+#ifdef __EMSCRIPTEN__
+#include <emscripten/em_js.h>
+#endif
+#undef Status // X11 headers are leaking this.
+
+#if SDL_VERSION_ATLEAST(2,0,4) && !defined(__EMSCRIPTEN__) && !defined(__ANDROID__) && !(defined(__APPLE__) && TARGET_OS_IOS) && !defined(__amigaos4__)
+#define SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE    1
+#else
+#define SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE    0
+#endif
+#define SDL_HAS_PER_MONITOR_DPI             SDL_VERSION_ATLEAST(2,0,4)
+#define SDL_HAS_VULKAN                      SDL_VERSION_ATLEAST(2,0,6)
+#define SDL_HAS_OPEN_URL                    SDL_VERSION_ATLEAST(2,0,14)
+#if SDL_HAS_VULKAN
+#include <SDL_vulkan.h>
+#endif
+# TODO: END
+
+function ImGui_ImplSDL2_InitForOpenGL(window::Ptr{SDL2.SDL_Window}, sdl_gl_context::Ptr{Cvoid})::Bool
+    return ImGui_ImplSDL2_Init(window, Ptr{SDL2.SDL_Renderer}(C_NULL), sdl_gl_context);
 end
 
-function ImGui_ImplSDL2_InitForOpenGL(window, sdl_gl_context)
-    #IM_UNUSED(sdl_gl_context); // Viewport branch will need this.
-    return ImGui_ImplSDL2_Init(window, Ptr{Cvoid}(C_NULL));
+function ImGui_ImplSDL2_InitForSDLRenderer(window::Ptr{SDL2.SDL_Window}, renderer::Ptr{SDL2.SDL_Renderer})::Bool
+    return ImGui_ImplSDL2_Init(window, renderer, Ptr{Cvoid}(C_NULL))
 end
 
-function ImGui_ImplSDL2_Init(window, renderer)
+function ImGui_ImplSDL2_Init(window::Ptr{SDL2.SDL_Window}, renderer::Ptr{SDL2.SDL_Renderer}, sdl_gl_context::Ptr{Cvoid})::Bool
     io = CImGui.GetIO()
+    #CImGui.IMGUI_CHECKVERSION()
     @assert unsafe_load(io.BackendPlatformUserData) == C_NULL
+    @assert SDL_VERSION_ATLEAST(Int32(2),Int32(0),Int32(4)) "SDL version must be at least 2.0.4"
 
     # Check and store if we are on a SDL backend that supports global mouse position
     # ("wayland" and "rpi" don't support it, but we chose to use a white-list instead of a black-list)
@@ -33,22 +49,38 @@ function ImGui_ImplSDL2_Init(window, renderer)
         end
     end
 
-    bd = ImGui_ImplSDL2_Data(
+    clipboard_text_data_ptr = Libc.malloc(sizeof(Cchar))
+    mouse_cursors_ptr = Libc.malloc(sizeof(SDL2.SDL_Cursor) * Int(9))
+    mouse_last_cursor_ptr = Libc.malloc(sizeof(SDL2.SDL_Cursor))
+    gamepads_ptr = Libc.malloc(sizeof(SDL2.SDL_GameController))
+
+    bd = Ptr{ImGui_ImplSDL2_Data}(Libc.malloc(sizeof(ImGui_ImplSDL2_Data)))
+    unsafe_store!(bd, ImGui_ImplSDL2_Data(
         window,
+        UInt32(0),
         renderer,
-        0,
-        0,
-        0,
-        fill(Ptr{Any}(C_NULL), Int(9)),
-        Ptr{Cvoid}(C_NULL),
-        0,
-        Ptr{Cchar}(C_NULL),
-        mouse_can_use_global_state
-    )
+        UInt64(0),
+        clipboard_text_data_ptr,
+        "",
+        UInt32(0),
+        Int32(0),
+        mouse_cursors_ptr,
+        mouse_last_cursor_ptr,
+        Int32(0),
+        false,
+        false,
+        gamepads_ptr,
+        Int32(0),
+        false
+    ))
     
-    #Todo: Actually use this
-    io.BackendPlatformUserData = pointer_from_objref(bd)
-    io.BackendPlatformName = pointer("imgui_impl_sdl2")
+    
+    io.BackendPlatformUserData = Ptr{Cvoid}(bd)
+    sdl_version_ptr = Ptr{SDL2.SDL_version}(Libc.malloc(sizeof(SDL2.SDL_version)))
+    SDL2.SDL_GetVersion(sdl_version_ptr)
+    sdl_version = unsafe_load(sdl_version_ptr)
+    Libc.free(sdl_version_ptr)
+    io.BackendPlatformName = pointer("imgui_impl_sdl2 ($(sdl_version.major).$(sdl_version.minor).$(sdl_version.patch), $(sdl_version.major).$(sdl_version.minor).$(sdl_version.patch))")
     io.BackendFlags = unsafe_load(io.BackendFlags) | CImGui.ImGuiBackendFlags_HasMouseCursors       # We can honor GetMouseCursor() values (optional)
     io.BackendFlags = unsafe_load(io.BackendFlags) | CImGui.ImGuiBackendFlags_HasSetMousePos        # We can honor io.WantSetMousePos requests (optional, rarely used)
     
@@ -137,8 +169,8 @@ function ImGui_ImplSDL2_GetBackendData()
         BackendPlatformUserData[].MouseWindowID,
         BackendPlatformUserData[].MouseButtonsDown,
         BackendPlatformUserData[].MouseCursors,
-        BackendPlatformUserData[].LastMouseCursor,
-        BackendPlatformUserData[].PendingMouseLeaveFrame,
+        BackendPlatformUserData[].MouseLastCursor,
+        BackendPlatformUserData[].MouseLastLeaveFrame,
         BackendPlatformUserData[].ClipboardTextData,
         BackendPlatformUserData[].MouseCanUseGlobalState
     ))
@@ -153,8 +185,8 @@ function ImGui_ImplSDL2_NewFrame()
     @assert bd != C_NULL "Did you call ImGui_ImplSDL2_Init()?"
     io = CImGui.GetIO()
     # Setup display size (every frame to accommodate for window resizing)
-    w, h = Cint(0), Cint(0)
-    display_w, display_h = Cint(0), Cint(0)
+    w, h = Int32(0), Int32(0)
+    display_w, display_h = Int32(0), Int32(0)
     @c SDL2.SDL_GetWindowSize(bd.Window, &w, &h)
     if SDL2.SDL_GetWindowFlags(bd.Window) & SDL2.SDL_WINDOW_MINIMIZED != 0
         w = h = 0
@@ -185,10 +217,10 @@ function ImGui_ImplSDL2_NewFrame()
     SDL2.SDL_Delay(10) # Todo: Update this. This is a hack to prevent backspace and enter from being called multiple times at once
     # FLT_MAX = igGET_FLT_MAX()
 
-    # #if bd.PendingMouseLeaveFrame && bd.PendingMouseLeaveFrame >= CImGui.GetFrameCount() && bd.MouseButtonsDown == 0
-    # if bd.PendingMouseLeaveFrame >= CImGui.GetFrameCount() && bd.MouseButtonsDown == 0
+    # #if bd.MouseLastLeaveFrame && bd.MouseLastLeaveFrame >= CImGui.GetFrameCount() && bd.MouseButtonsDown == 0
+    # if bd.MouseLastLeaveFrame >= CImGui.GetFrameCount() && bd.MouseButtonsDown == 0
     #     bd.MouseWindowID = 0
-    #     bd.PendingMouseLeaveFrame = 0
+    #     bd.MouseLastLeaveFrame = 0
     #      CImGui.ImGuiIO_AddMousePosEvent(io, -FLT_MAX, -FLT_MAX)
     # end
 
@@ -212,12 +244,12 @@ function ImGui_ImplSDL2_UpdateMouseData()
     if is_app_focused
         # (Optional) Set OS mouse position from Dear ImGui if requested (rarely used, only when ImGuiConfigFlags_NavEnableSetMousePos is enabled by user)
         if unsafe_load(io.WantSetMousePos)
-            SDL2.SDL_WarpMouseInWindow(bd.Window, Cint(io.MousePos.x), Cint(io.MousePos.y))
+            SDL2.SDL_WarpMouseInWindow(bd.Window, Int32(io.MousePos.x), Int32(io.MousePos.y))
         end
 
         # (Optional) Fallback to provide mouse position when focused (SDL_MOUSEMOTION already provides this when hovered or captured)
         if bd.MouseCanUseGlobalState && bd.MouseButtonsDown == 0
-            window_x, window_y, mouse_x_global, mouse_y_global = Cint(0), Cint(0), Cint(0), Cint(0)
+            window_x, window_y, mouse_x_global, mouse_y_global = Int32(0), Int32(0), Int32(0), Int32(0)
             @c SDL2.SDL_GetGlobalMouseState(&mouse_x_global, &mouse_y_global)
             @c SDL2.SDL_GetWindowPosition(bd.Window, &window_x, &window_y)
              CImGui.ImGuiIO_AddMousePosEvent(io, Cfloat(mouse_x_global - window_x), Cfloat(mouse_y_global - window_y))
@@ -239,16 +271,12 @@ function ImGui_ImplSDL2_UpdateMouseCursor()
     else
         # Show OS mouse cursor
         expected_cursor = bd.MouseCursors[imgui_cursor+1] != C_NULL ? bd.MouseCursors[imgui_cursor+1] : bd.MouseCursors[ CImGui.ImGuiMouseCursor_Arrow+1]
-        if bd.LastMouseCursor != expected_cursor
+        if bd.MouseLastCursor != expected_cursor
             SDL2.SDL_SetCursor(expected_cursor) # SDL function doesn't have an early out (see #6113)
-            bd.LastMouseCursor = expected_cursor
+            bd.MouseLastCursor = expected_cursor
         end
         SDL2.SDL_ShowCursor(SDL2.SDL_TRUE)
     end
-end
-
-function ImGui_ImplSDL2_InitForSDLRenderer(window, renderer)
-    return ImGui_ImplSDL2_Init(window, renderer)
 end
 
 function ImGui_ImplSDL2_ProcessEvent(event)
@@ -302,10 +330,10 @@ function ImGui_ImplSDL2_ProcessEvent(event)
         if window_event == SDL2.SDL_WINDOWEVENT_ENTER
             io::Ptr{ CImGui.ImGuiIO} = CImGui.GetIO()
             bd.MouseWindowID = event.window.windowID
-            bd.PendingMouseLeaveFrame = 0
+            bd.MouseLastLeaveFrame = 0
         end
         if window_event == SDL2.SDL_WINDOWEVENT_LEAVE
-            bd.PendingMouseLeaveFrame = CImGui.GetFrameCount() + 1
+            bd.MouseLastLeaveFrame = CImGui.GetFrameCount() + 1
         end
         if window_event == SDL2.SDL_WINDOWEVENT_FOCUS_GAINED
              CImGui.ImGuiIO_AddFocusEvent(io, true)

@@ -158,9 +158,9 @@ function ImGui_ImplSDLRenderer2_RenderDrawData(draw_data)
 
                 res = SDL2.SDL_RenderGeometryRaw(sdlRenderer,
                 tex,
-                xy, Cint(sizeof(CImGui.ImDrawVert)),
-                color, Cint(sizeof(CImGui.ImDrawVert)),
-                uv, Cint(sizeof(CImGui.ImDrawVert)),
+                xy, Int32(sizeof(CImGui.ImDrawVert)),
+                color, Int32(sizeof(CImGui.ImDrawVert)),
+                uv, Int32(sizeof(CImGui.ImDrawVert)),
                 num_vertices,
                 indices, elem_count, sizeof(CImGui.ImDrawIdx))
 
@@ -210,7 +210,7 @@ function ImGui_ImplSDLRenderer2_CreateFontsTexture(bd)
     # Build texture atlas
     fonts = unsafe_load(io.Fonts)
     pixels = Ptr{Cuchar}(C_NULL)
-    width, height = Cint(0), Cint(0)
+    width, height = Int32(0), Int32(0)
     @c CImGui.ImFontAtlas_GetTexDataAsRGBA32(fonts, &pixels, &width, &height, C_NULL)
 
     # Upload texture to graphics system
@@ -248,9 +248,4 @@ end
 
 function ImGui_ImplSDLRenderer2_DestroyDeviceObjects()
     ImGui_ImplSDLRenderer2_DestroyFontsTexture()
-end
-
-@generated function offsetof(::Type{X}, ::Val{field}) where {X,field}
-    idx = findfirst(f->f==field, fieldnames(X))
-    return fieldoffset(X, idx)
 end
