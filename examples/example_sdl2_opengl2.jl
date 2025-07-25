@@ -9,7 +9,6 @@ module Editor
     using ImGuiOpenGLBackend #CImGui.OpenGLBackend
     using ImGuiOpenGLBackend.ModernGL
     global sdlVersion = "2.0.0"
-    global const BackendPlatformUserData = Ref{Any}(C_NULL)
 
     include(joinpath("..", "src", "imgui_impl_sdl2.jl"))
 
