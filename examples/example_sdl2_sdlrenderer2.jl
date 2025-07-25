@@ -90,7 +90,7 @@ module Editor
                     CImGui.NewFrame()
 
                     CImGui.igDockSpaceOverViewport(C_NULL, C_NULL, CImGui.ImGuiDockNodeFlags_PassthruCentralNode, C_NULL) # Creating the "dockspace" that covers the whole window. This allows the child windows to automatically resize.
-                    @c CImGui.ShowDemoWindow(Ref{Bool}(showDemoWindow))
+                    CImGui.ShowDemoWindow(Ref{Bool}(true))
 
                     @cstatic begin
                         CImGui.Begin("Controls")  
@@ -125,4 +125,3 @@ module Editor
     end
 end
 Editor.run()
-```

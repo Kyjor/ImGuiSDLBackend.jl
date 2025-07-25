@@ -30,14 +30,26 @@ end
 
 function ImGui_ImplSDLRenderer2_Shutdown()
     bd = ImGui_ImplSDLRenderer2_GetBackendData()
-#    @assert bd != C_NULL # "No renderer backend to shutdown, or already shutdown?"
+    @assert bd != Ptr{ImGui_ImplSDLRenderer2_Data}(C_NULL) "No renderer backend to shutdown, or already shutdown?"
     io = CImGui.GetIO()
 
-    ImGui_ImplSDLRenderer2_DestroyDeviceObjects()
+    if bd.ClipboardTextData != Ptr{Cchar}(C_NULL)
+        SDL2.SDL_free(bd.ClipboardTextData)
+        bd.ClipboardTextData = Ptr{Cchar}(C_NULL)
+    end
+    for i = 0:CImGui.ImGuiMouseCursor_COUNT-1
+        if bd.MouseCursors[i] != Ptr{SDL2.SDL_Cursor}(C_NULL)
+            SDL2.SDL_FreeCursor(bd.MouseCursors[i])
+            bd.MouseCursors[i] = Ptr{SDL2.SDL_Cursor}(C_NULL)
+        end
+    end
 
     io.BackendRendererName = C_NULL
     io.BackendRendererUserData = C_NULL
-    io.BackendFlags &= ~ImGuiBackendFlags_RendererHasVtxOffset
+    io.BackendFlags &= ~CImGui.ImGuiBackendFlags_HasMouseCursors
+    io.BackendFlags &= ~CImGui.ImGuiBackendFlags_HasSetMousePos
+    io.BackendFlags &= ~CImGui.ImGuiBackendFlags_HasGamepad
+    CImGui.IM_DELETE(bd)
 end
 
 function ImGui_ImplSDLRenderer2_SetupRenderState()
