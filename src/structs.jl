@@ -14,7 +14,7 @@ struct ImGui_ImplSDL2_Data
     #  Mouse handling
     MouseWindowID::UInt32
     MouseButtonsDown::Int32
-    MouseCursors::Vector{SDL2.SDL_Cursor}
+    MouseCursors::NTuple{9, Ptr{SDL2.SDL_Cursor}}  # Fixed-size array like C++ version
     MouseLastCursor::Ptr{SDL2.SDL_Cursor}
     MouseLastLeaveFrame::Int32
     MouseCanUseGlobalState::Bool
@@ -35,7 +35,7 @@ function Base.getproperty(x::Ptr{ImGui_ImplSDL2_Data}, f::Symbol)
     f === :BackendPlatformName && return unsafe_load(Ptr{Ptr{Cchar}}(x + offsetof(ImGui_ImplSDL2_Data, Val(:BackendPlatformName))))
     f === :MouseWindowID && return unsafe_load(Ptr{UInt32}(x + offsetof(ImGui_ImplSDL2_Data, Val(:MouseWindowID))))
     f === :MouseButtonsDown && return unsafe_load(Ptr{Int32}(x + offsetof(ImGui_ImplSDL2_Data, Val(:MouseButtonsDown))))
-    f === :MouseCursors && return unsafe_load(Ptr{Vector{SDL2.SDL_Cursor}}(x + offsetof(ImGui_ImplSDL2_Data, Val(:MouseCursors))))
+    f === :MouseCursors && return unsafe_load(Ptr{NTuple{9, Ptr{SDL2.SDL_Cursor}}}(x + offsetof(ImGui_ImplSDL2_Data, Val(:MouseCursors))))
     f === :MouseLastCursor && return unsafe_load(Ptr{Ptr{SDL2.SDL_Cursor}}(x + offsetof(ImGui_ImplSDL2_Data, Val(:MouseLastCursor))))
     f === :MouseLastLeaveFrame && return unsafe_load(Ptr{Int32}(x + offsetof(ImGui_ImplSDL2_Data, Val(:MouseLastLeaveFrame))))
     f === :MouseCanUseGlobalState && return unsafe_load(Ptr{Bool}(x + offsetof(ImGui_ImplSDL2_Data, Val(:MouseCanUseGlobalState))))
@@ -54,7 +54,7 @@ function Base.setproperty!(x::Ptr{ImGui_ImplSDL2_Data}, f::Symbol, v::Any)
     f === :BackendPlatformName && return unsafe_store!(Ptr{Ptr{Cchar}}(x + offsetof(ImGui_ImplSDL2_Data, Val(:BackendPlatformName))), v)
     f === :MouseWindowID && return unsafe_store!(Ptr{UInt32}(x + offsetof(ImGui_ImplSDL2_Data, Val(:MouseWindowID))), v)
     f === :MouseButtonsDown && return unsafe_store!(Ptr{Int32}(x + offsetof(ImGui_ImplSDL2_Data, Val(:MouseButtonsDown))), v)
-    f === :MouseCursors && return unsafe_store!(Ptr{Vector{SDL2.SDL_Cursor}}(x + offsetof(ImGui_ImplSDL2_Data, Val(:MouseCursors))), v)
+    f === :MouseCursors && return unsafe_store!(Ptr{NTuple{9, Ptr{SDL2.SDL_Cursor}}}(x + offsetof(ImGui_ImplSDL2_Data, Val(:MouseCursors))), v)
     f === :MouseLastCursor && return unsafe_store!(Ptr{Ptr{SDL2.SDL_Cursor}}(x + offsetof(ImGui_ImplSDL2_Data, Val(:MouseLastCursor))), v)
     f === :MouseLastLeaveFrame && return unsafe_store!(Ptr{Int32}(x + offsetof(ImGui_ImplSDL2_Data, Val(:MouseLastLeaveFrame))), v)
     f === :MouseCanUseGlobalState && return unsafe_store!(Ptr{Bool}(x + offsetof(ImGui_ImplSDL2_Data, Val(:MouseCanUseGlobalState))), v)

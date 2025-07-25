@@ -9,7 +9,6 @@ module Editor
     const SDL2 = SimpleDirectMediaLayer
     global sdlVersion = "2.0.0"
     global sdlRenderer = C_NULL
-    global const BackendPlatformUserData = Ref{Any}(C_NULL)
 
     include(joinpath("..", "src", "imgui_impl_sdl2.jl"))
     include(joinpath("..", "src", "imgui_impl_sdlrenderer2.jl"))
