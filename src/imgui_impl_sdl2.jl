@@ -23,11 +23,11 @@ include("structs.jl")
 #endif
 # TODO: END
 
-function ImGui_ImplSDL2_SetClipboardText(user_data::Ptr{Cvoid}, text::Cstring)
+function ImGui_ImplSDL2_SetClipboardText(user_data::Ptr{Cvoid}, text::Ptr{Cchar})
     SDL2.SDL_SetClipboardText(text)
 end
 
-function ImGui_ImplSDL2_GetClipboardText(user_data::Ptr{Cvoid})
+function ImGui_ImplSDL2_GetClipboardText(user_data::Ptr{Cvoid})::Ptr{Cchar}
     bd = ImGui_ImplSDL2_GetBackendData()
     if (bd.ClipboardTextData != C_NULL && bd.ClipboardTextData !== nothing)
         SDL2.SDL_free(bd.ClipboardTextData)
@@ -36,14 +36,31 @@ function ImGui_ImplSDL2_GetClipboardText(user_data::Ptr{Cvoid})
     return bd.ClipboardTextData
 end
 
+# struct ImGuiPlatformImeData
+#     {
+#         bool WantVisible;
+#         bool WantTextInput;
+#         ImVec2 InputPos;
+#         float InputLineHeight;
+#         ImGuiID ViewportId;
+#     };
 function ImGui_ImplSDL2_PlatformSetImeData(data::Ptr{CImGui.ImGuiPlatformImeData})
-    data_ptr = unsafe_load(data)
-    if data_ptr.WantVisible
+    want_visible = unsafe_load(Ptr{Bool}(data + offsetof(CImGui.ImGuiPlatformImeData, Val(:WantVisible))))
+    input_pos = unsafe_load(Ptr{CImGui.ImVec2}(data + offsetof(CImGui.ImGuiPlatformImeData, Val(:InputPos))))
+    input_line_height = unsafe_load(Ptr{Float32}(data + offsetof(CImGui.ImGuiPlatformImeData, Val(:InputLineHeight))))
+    viewport_id = unsafe_load(Ptr{CImGui.ImGuiID}(data + offsetof(CImGui.ImGuiPlatformImeData, Val(:ViewportId))))
+    want_text_input = unsafe_load(Ptr{Bool}(data + offsetof(CImGui.ImGuiPlatformImeData, Val(:WantTextInput))))
+    println("want_visible: ", want_visible)
+    println("input_pos: ", input_pos)
+    println("input_line_height: ", input_line_height)
+    println("viewport_id: ", viewport_id)
+    println("want_text_input: ", want_text_input)
+    if want_visible
         r::SDL2.SDL_Rect = SDL2.SDL_Rect(
-            Int32(data_ptr.InputPos.x),
-            Int32(data_ptr.InputPos.y),
+            Int32(input_pos.x),
+            Int32(input_pos.y),
             1,
-            Int32(data_ptr.InputLineHeight)
+            Int32(input_line_height)
         )
         SDL2.SDL_SetTextInputRect(Ref(r))
     end
@@ -138,9 +155,8 @@ function ImGui_ImplSDL2_Init(window::Ptr{SDL2.SDL_Window}, renderer::Ptr{SDL2.SD
     end
     # set clipboard
     platform_io = CImGui.igGetPlatformIO()
-    #ImGui_ImplSDL2_SetClipboardText_ptr = @cfunction(ImGui_ImplSDL2_SetClipboardText, Cvoid, (Ptr{Cvoid}, Cstring))
-    io.SetClipboardTextFn = @cfunction(ImGui_ImplSDL2_SetClipboardText, Cvoid, (Ptr{Cvoid}, Cstring))
-    io.GetClipboardTextFn = @cfunction(ImGui_ImplSDL2_GetClipboardText, Cstring, (Ptr{Cvoid},))
+    io.SetClipboardTextFn = @cfunction(ImGui_ImplSDL2_SetClipboardText, Cvoid, (Ptr{Cvoid}, Ptr{Cchar}))
+    io.GetClipboardTextFn = @cfunction(ImGui_ImplSDL2_GetClipboardText, Ptr{Cchar}, (Ptr{Cvoid},))
     io.ClipboardUserData = C_NULL
     io.SetPlatformImeDataFn = @cfunction(ImGui_ImplSDL2_PlatformSetImeData, Cvoid, (Ptr{CImGui.ImGuiPlatformImeData},))
 
